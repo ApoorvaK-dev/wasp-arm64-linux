@@ -5,7 +5,8 @@ on:
 
 jobs:
   build-binary:
-    runs-on: ubuntu-latest
+    # CHANGED: Use GitHub's native ARM64 Ubuntu runner
+    runs-on: ubuntu-24.04-arm64
 
     steps:
     - name: Check out Wasp source
@@ -14,36 +15,34 @@ jobs:
         repository: 'wasp-lang/wasp'
         ref: 'main'
 
-    - name: Set up QEMU for ARM64 Emulation
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: arm64
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential curl libgmp-dev libffi-dev zlib1g-dev libncurses-dev
 
-    - name: Compile inside ARM64 Container
-      uses: addnab/docker-run-action@v3
+    - name: Set up Haskell GHC Toolchain
+      uses: haskell-actions/setup@v2
       with:
-        image: arm64v8/ubuntu:22.04
-        # FIXED: Added the --platform tag so Docker knows to use QEMU emulation
-        options: -v ${{ github.workspace }}:/workspace --platform linux/arm64
-        run: |
-          apt-get update
-          apt-get install -y build-essential curl libgmp-dev libffi-dev zlib1g-dev libncurses-dev
-          
-          # Install GHCup natively inside the emulated container
-          export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
-          export BOOTSTRAP_HASKELL_MINIMAL=1
-          curl --proto '=https' --tlsv1.2 -sSf haskell.org | sh
-          . /root/.ghcup/env
-          ghcup install ghc latest --set
-          ghcup install cabal latest --set
-          
-          # Build the binary
-          cd /workspace/waspc
-          cabal update
-          cabal build exe:wasp
-          
-          # Move the compiled binary file to the main folder
-          cp $(cabal list-bin exe:wasp) /workspace/wasp-bin-arm64
+        ghc-version: '9.6' # Explicitly lock to Wasp's tested long-term support version
+        cabal-version: 'latest'
+
+    - name: Cache Haskell Compiler Assets
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cabal/packages
+          ~/.cabal/store
+          waspc/dist-newstyle
+        key: ${{ runner.os }}-cabal-${{ hashFiles('**/*.cabal') }}
+
+    - name: Configure and Compile Wasp
+      run: |
+        cd waspc
+        cabal update
+        cabal build exe:wasp
+        
+        # Move the binary out of the hidden cabal folders into the root workspace
+        cp $(cabal list-bin exe:wasp) ../wasp-bin-arm64
 
     - name: Upload Native ARM64 Binary
       uses: actions/upload-artifact@v4
