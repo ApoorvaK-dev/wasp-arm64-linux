@@ -1,0 +1,83 @@
+name: Build Wasp ARM64
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ARM64 builder image
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            -f Dockerfile.arm64 \
+            -t wasp-arm64-builder \
+            --load \
+            .
+
+      # Persist Cabal cache between builds
+      - name: Restore Cabal cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cabal/store
+            ~/.cabal/packages
+          key: cabal-${{ runner.os }}-${{ hashFiles('waspc/**/*.cabal') }}
+          restore-keys: |
+            cabal-${{ runner.os }}-
+
+      - name: Build Wasp compiler
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -v $HOME/.cabal:/root/.cabal \
+            wasp-arm64-builder \
+            bash -c "
+              set -e
+
+              cd /workspace/waspc
+
+              cabal update
+
+              chmod +x ./run || true
+
+              cabal build -j1 exe:waspc
+            "
+
+      - name: Collect binaries
+        run: |
+          mkdir -p output
+
+          find waspc/dist-newstyle \
+            -type f \
+            -executable \
+            -name waspc \
+            -exec cp {} output/ \;
+
+      - name: Verify artifact
+        run: |
+          ls -lah output
+          file output/waspc || true
+
+      - name: Upload ARM64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasp-arm64
+          path: output/
+          compression-level: 9
