@@ -14,23 +14,22 @@ jobs:
         repository: 'wasp-lang/wasp'
         ref: 'main'
 
-    # Set up emulation so the x86 host can run arm64 instructions
     - name: Set up QEMU for ARM64 Emulation
       uses: docker/setup-qemu-action@v3
       with:
         platforms: arm64
 
-    # Run the build natively inside an ARM64 Ubuntu container environment
     - name: Compile inside ARM64 Container
       uses: addnab/docker-run-action@v3
       with:
         image: arm64v8/ubuntu:22.04
-        options: -v ${{ github.workspace }}:/workspace
+        # FIXED: Added the --platform tag so Docker knows to use QEMU emulation
+        options: -v ${{ github.workspace }}:/workspace --platform linux/arm64
         run: |
           apt-get update
           apt-get install -y build-essential curl libgmp-dev libffi-dev zlib1g-dev libncurses-dev
           
-          # Install GHCup natively inside the emulated arm64 container
+          # Install GHCup natively inside the emulated container
           export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
           export BOOTSTRAP_HASKELL_MINIMAL=1
           curl --proto '=https' --tlsv1.2 -sSf haskell.org | sh
@@ -38,12 +37,12 @@ jobs:
           ghcup install ghc latest --set
           ghcup install cabal latest --set
           
-          # Build the binary natively
+          # Build the binary
           cd /workspace/waspc
           cabal update
           cabal build exe:wasp
           
-          # Stage the compiled binary file to the root workspace folder
+          # Move the compiled binary file to the main folder
           cp $(cabal list-bin exe:wasp) /workspace/wasp-bin-arm64
 
     - name: Upload Native ARM64 Binary
