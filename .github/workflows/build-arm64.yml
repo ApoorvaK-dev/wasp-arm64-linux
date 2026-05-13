@@ -38,20 +38,25 @@ jobs:
           path: |
             ~/.cabal/store
             ~/.cabal/packages
-          key: cabal-${{ runner.os }}-${{ hashFiles('waspc/**/*.cabal') }}
+          key: cabal-${{ runner.os }}-${{ hashFiles('**/*.cabal') }}
           restore-keys: |
             cabal-${{ runner.os }}-
 
       - name: Build Wasp compiler
         run: |
           docker run --rm \
+            --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
             -v $HOME/.cabal:/root/.cabal \
             wasp-arm64-builder \
             bash -c "
               set -e
 
-              cd /workspace/waspc
+              cd /workspace
+
+              git clone https://github.com/wasp-lang/wasp.git
+
+              cd wasp/waspc
 
               cabal update
 
@@ -64,7 +69,7 @@ jobs:
         run: |
           mkdir -p output
 
-          find waspc/dist-newstyle \
+          find wasp/waspc/dist-newstyle \
             -type f \
             -executable \
             -name waspc \
