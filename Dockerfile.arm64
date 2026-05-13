@@ -1,0 +1,43 @@
+FROM arm64v8/ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV BOOTSTRAP_HASKELL_NONINTERACTIVE=1
+
+RUN apt update && apt install -y \
+    curl \
+    git \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    xz-utils \
+    pkg-config \
+    libffi-dev \
+    libgmp-dev \
+    libncurses-dev \
+    zlib1g-dev \
+    libtinfo-dev \
+    ca-certificates \
+    nodejs \
+    npm \
+    unzip
+
+# Install ghcup
+RUN curl https://get-ghcup.haskell.org -sSf | sh
+
+ENV PATH="/root/.ghcup/bin:/root/.cabal/bin:$PATH"
+
+# Install stable compiler versions
+RUN ghcup install ghc 9.6.6
+RUN ghcup set ghc 9.6.6
+
+RUN ghcup install cabal 3.10.3.0
+RUN ghcup set cabal 3.10.3.0
+
+# Verify toolchain
+RUN ghc --version
+RUN cabal --version
+RUN node --version
+RUN npm --version
+
+WORKDIR /workspace
