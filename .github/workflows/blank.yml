@@ -1,51 +1,54 @@
 name: Build Wasp AI for ARM64 Linux
 
 on:
-  workflow_dispatch: # Allows you to manually click "Run" in your GitHub browser
+  workflow_dispatch:
 
 jobs:
   build-binary:
-    # Use standard Ubuntu runner - we will cross-compile to arm64 inside it
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check out the official Wasp code
+    - name: Check out Wasp source
       uses: actions/checkout@v4
       with:
         repository: 'wasp-lang/wasp'
-        ref: 'main' # Compiles the latest main branch version
+        ref: 'main'
 
-    - name: Set up Haskell GHC Toolchain
-      uses: haskell-actions/setup@v2
+    # Set up emulation so the x86 host can run arm64 instructions
+    - name: Set up QEMU for ARM64 Emulation
+      uses: docker/setup-qemu-action@v3
       with:
-        ghc-version: 'latest'
-        cabal-version: 'latest'
+        platforms: arm64
 
-    - name: Install System Architecture Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libgmp-dev
-
-    - name: Cache Haskell Compiler Assets
-      uses: actions/cache@v4
+    # Run the build natively inside an ARM64 Ubuntu container environment
+    - name: Compile inside ARM64 Container
+      uses: addnab/docker-run-action@v3
       with:
-        path: |
-          ~/.cabal/packages
-          ~/.cabal/store
-          waspc/dist-newstyle
-        key: ${{ runner.os }}-cabal-${{ hashFiles('**/*.cabal') }}
+        image: arm64v8/ubuntu:22.04
+        options: -v ${{ github.workspace }}:/workspace
+        run: |
+          apt-get update
+          apt-get install -y build-essential curl libgmp-dev libffi-dev zlib1g-dev libncurses-dev
+          
+          # Install GHCup natively inside the emulated arm64 container
+          export BOOTSTRAP_HASKELL_NONINTERACTIVE=1
+          export BOOTSTRAP_HASKELL_MINIMAL=1
+          curl --proto '=https' --tlsv1.2 -sSf haskell.org | sh
+          . /root/.ghcup/env
+          ghcup install ghc latest --set
+          ghcup install cabal latest --set
+          
+          # Build the binary natively
+          cd /workspace/waspc
+          cabal update
+          cabal build exe:wasp
+          
+          # Stage the compiled binary file to the root workspace folder
+          cp $(cabal list-bin exe:wasp) /workspace/wasp-bin-arm64
 
-    - name: Configure and Compile Wasp
-      run: |
-        cd waspc
-        cabal update
-        # Set target to Linux ARM64 (AArch64) during compilation
-        cabal configure --with-compiler=ghc --ghc-options="-target aarch64-unknown-linux-gnu"
-        cabal build exe:wasp
-
-    - name: Upload the Compiled ARM64 Binary
+    - name: Upload Native ARM64 Binary
       uses: actions/upload-artifact@v4
       with:
         name: wasp-linux-arm64
-        path: waspc/dist-newstyle/build/aarch64-unknown-linux-gnu/*/wasp-*/x/wasp/build/wasp/wasp
+        path: wasp-bin-arm64
         
