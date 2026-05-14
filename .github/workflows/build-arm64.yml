@@ -62,7 +62,7 @@ jobs:
 
               chmod +x ./run || true
 
-              cabal build -j1
+              cabal build -j1 waspc
             "
 
       - name: Collect binaries
