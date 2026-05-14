@@ -9,7 +9,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04-arm 
-    # This environment variable forces actions/checkout@v4 to use Node 24, fixing the deprecation warning
+    # Forces actions/checkout@v4 to use Node 24, fixing the deprecation warning
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
 
@@ -28,7 +28,6 @@ jobs:
       - name: Setup Haskell
         uses: haskell-actions/setup@v2
         with:
-          # Updated to match Wasp's strict compiler requirements
           ghc-version: '9.6.7' 
           cabal-version: 'latest'
 
@@ -40,7 +39,7 @@ jobs:
           
           # Create output directory and move the compiled binary
           mkdir -p ../output
-          cp $(cabal list-bin waspc) ../output/wasp-linux-arm64
+          cp $(cabal list-bin wasp-cli) ../output/wasp-linux-arm64
           chmod +x ../output/wasp-linux-arm64
 
       - name: Create GitHub Release
