@@ -1,0 +1,52 @@
+name: Build and Release Wasp for ARM64 Linux
+
+on:
+  workflow_dispatch: # Allows you to manually trigger the build
+
+# CRITICAL: This permission is required for the action to create a GitHub Release
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm 
+
+    steps:
+      - name: Checkout Wasp Source Code
+        uses: actions/checkout@v4
+        with:
+          repository: wasp-lang/wasp
+          ref: main 
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libgmp-dev zlib1g-dev
+
+      - name: Setup Haskell
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.4' 
+          cabal-version: 'latest'
+
+      - name: Build Wasp CLI
+        working-directory: ./waspc
+        run: |
+          cabal update
+          cabal build 
+          
+          # Create output directory and move the compiled binary
+          mkdir -p ../output
+          cp $(cabal list-bin waspc) ../output/wasp-linux-arm64
+          chmod +x ../output/wasp-linux-arm64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: output/wasp-linux-arm64
+          tag_name: "arm-build-${{ github.run_number }}"
+          name: "Wasp ARM64 Build #${{ github.run_number }}"
+          body: "Automated ARM64 Linux build of the Wasp compiler."
+          draft: false
+          prerelease: false
+          
