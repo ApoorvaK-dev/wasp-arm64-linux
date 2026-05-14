@@ -1,15 +1,17 @@
 name: Build and Release Wasp for ARM64 Linux
 
 on:
-  workflow_dispatch: # Allows you to manually trigger the build
+  workflow_dispatch:
 
-# CRITICAL: This permission is required for the action to create a GitHub Release
 permissions:
   contents: write
 
 jobs:
   build:
     runs-on: ubuntu-24.04-arm 
+    # This environment variable forces actions/checkout@v4 to use Node 24, fixing the deprecation warning
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
 
     steps:
       - name: Checkout Wasp Source Code
@@ -26,7 +28,8 @@ jobs:
       - name: Setup Haskell
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: '9.4' 
+          # Updated to match Wasp's strict compiler requirements
+          ghc-version: '9.6.7' 
           cabal-version: 'latest'
 
       - name: Build Wasp CLI
